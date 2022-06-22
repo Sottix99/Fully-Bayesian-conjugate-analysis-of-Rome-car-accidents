@@ -1,0 +1,500 @@
+---
+title: "Homework 1"
+author: "Alessandro Sottile 1873637"
+date: ''
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Fully Bayesian conjugate analysis of Rome car accidents
+# 1
+
+First we need to upload the data.
+
+```{r}
+load(file= "homework_1.RData")
+mydata <- subset(roma,subset=sign_up_number==104)
+str(mydata)
+
+y_sum<-as.numeric(sum(mydata$car_accidents))
+n<-as.numeric(length(mydata$car_accidents))
+y_bar<-y_sum/n
+y_bar
+```
+
+```{r, echo = F}
+plot( mydata$week ,mydata$car_accidents , col="red", pch=16, xaxt="n",xlab="Weeks", ylab="Number of accidents", main="Distribution of the accidents in the considered days")
+lines( mydata$week ,mydata$car_accidents , col="blue",  xaxt="n",xlab="Weeks", ylab="Number of accidents")
+axis(1, at = seq(round(min(mydata$week)), round(max(mydata$week)), by = 1), labels = 1:19)
+```
+
+This plot represent the number of car accidents in each considered day.
+
+```{r, echo = F}
+plot(table(mydata$car_accidents),col="red",  xaxt="n", xlab="Accidents in a day", ylab="Frequency", main="Frequencies of car accidents")
+axis(1, at = seq(round(min(mydata$car_accidents)), round(max(mydata$car_accidents)), by = 1), labels = 1:8)
+
+
+```
+
+Analyzing the plots reported we realize that the distribution is not symmetrical, most of the data tends to be distributed between 2 and 5. Moreover in three weekdays there were 8 accidents, this value is quite extreme compared to the others. 
+
+In addition, knowing that the average number of car accidents in Rome is 3.22, we can state that in the 19 Saturdays present in the dataset, the average value is higher (3.89).
+
+# 2
+
+To perform Bayesian inference, we need a prior distribution for the unknown rate $\theta$ .
+For mathematical convenience we use a gamma distribution, which is conjugate to the Poisson.
+\
+
+We assume that the mean is equal to the variance, because the accidents of the machines re-enter in the category of the rare events, which distributing itself like a poisson, having mean and variance both equal to the unknown parameter.
+
+So we have to built a system of equations to find the proper parameters for $s$ and $r$ of Gamma distribution.
+
+
+
+\begin{cases}
+\frac{s}{r} = 3.22\\
+\frac{s}{r^2} = 3.22
+
+\end{cases}
+
+
+$\Longrightarrow$
+
+
+
+\begin{cases}
+s = 3.22 \\
+r = 1
+
+\end{cases}
+
+```{r}
+s_pre<-3.22
+r_pre<-1
+```
+
+
+```{r}
+s_post<-s_pre + y_sum
+r_post<-r_pre + n
+
+```
+
+
+
+
+# 3
+
+
+# a)
+
+The three alternatives point estimates are the Mean, the Mode and the Median.
+
+```{r}
+Mode_Post<- (s_post-1)/r_post
+Mean_Post<-s_post/r_post
+Median_Post<-qgamma(0.5, s_post, r_post)
+
+cbind(Mode_Post,Median_Post,Mean_Post)
+```
+The three values are extremely similar to each other.
+It is known that in the Gaussian mean, mode and median coincide at the theoretical level, so it is possible to argue that this posterior distribution can be approximated to a Gaussian. 
+
+It is possible to perform the Shapiro-Wilk test to analyze this assumption.
+```{r}
+P_vector<-rep(0,1000)
+for (i in 1:1000){
+sample<-rgamma(200,s_post,r_post)
+a<-shapiro.test(sample)
+P_vector[i]<-a$p.value
+}
+length(P_vector[P_vector>0.05])/length(P_vector)
+
+```
+
+By running the test 1000 times the normality of the sample generated from the Posterior distribution is accepted about 80% of the time.
+
+# b)
+
+```{r, echo = F}
+Mean_pre<-3.22
+polygon(curve(dgamma(x,shape= 3.22, rate= 1),from=0,to=10,xlab=expression(theta),main="Uncertainity",cex.main=0.5,1000,ylim=c(0,2), col="orange", lwd=2, ylab="Density"),col=c("orange",alpha=0.2))
+
+polygon(curve(dgamma(x,shape=s_post,rate=r_post),from=0,to=10,xlab=expression(theta),main="",cex.main=0.5,1000,add=TRUE, col = '#528B8B', lwd=2), col = "#528B8B")
+legend("topright",legend=c("Prior", "Posterior"), fill=c("orange", "#528B8B"),bg="#CAFF70")
+
+abline(v=Mean_Post,lty=2,lwd=2)
+abline(v=Mean_pre,lty=2,lwd=2)
+text(x=2.5,y=0.5,"Prior Mean \n 3.22",col="orange")
+text(x=5,y=1,"Posterior Mean \n 3.8",col="#528B8B")
+```
+
+
+To evaluate the uncertainty of posterior distribution we can use the posterior variance. 
+
+```{r}
+Variance_Post<- s_post/(r_post)^2
+Variance_Post
+```
+
+
+
+# c)
+Equal Tailed Interval (ETI)
+
+```{r}
+alpha_conf<-0.05 # set the value of Alpha
+
+q_lower <- qgamma(alpha_conf / 2, s_post, r_post)
+q_upper <- qgamma(1 - alpha_conf / 2, s_post, r_post)
+c(q_lower, q_upper) # 95% equal-tailed CI for the model
+
+
+```
+
+```{r, echo = F}
+theta <- seq(0,7, by = 0.001) # set up grid for plotting
+plot(theta, dgamma(theta, s_post, r_post), type = 'l', lwd = 2, col = '#528B8B',
+     ylim = c(0, 1.5), xlab = expression(theta),main="Equal-tailed Interval",ylab="")
+y_val <- dgamma(theta, s_post, r_post)
+x_coord <- c(q_lower, theta[theta >= q_lower & theta <= q_upper], q_upper)
+y_coord <- c(0, y_val[theta >= q_lower & theta <= q_upper], 0)
+polygon(x_coord, y_coord, col = '#79CDCD', lwd = 2,  border = '#528B8B')
+abline(v=Mean_Post,lwd=2,col="#CD4F39",lty=2)
+```
+
+
+
+Highest Posterior Density (HPD)
+
+```{r}
+posterior_qf <- function(x){
+  qgamma(x,shape=s_post,rate=r_post)
+}
+
+library(TeachingDemos)
+hpd(posterior.icdf=posterior_qf, conf=0.95, tol=0.00000001)
+
+```
+
+
+```{r}
+W_hpd<-diff(hpd(posterior.icdf=posterior_qf, conf=0.95, tol=0.00000001)) # HPD method
+W_eti<-diff(c(q_lower, q_upper)) # ETI
+cbind(W_hpd,W_eti)
+```
+
+Generally, it is better to use HPD as the interval instead of Equal Tailed (ETI) for the posterior distribution.
+The reason for using the HPD is that all the values inside the interval have higher probability density (i.e., credibility) than any value outside. The HPD therefore includes the most credible values of $\theta$.
+Instead a 95% ETI has 2.5% of the distribution on either side of its limits. It indicates the 2.5th percentile and the 97.5th percentile.
+
+However in symmetric distributions, the ETI and HPD are Identical, in fact in our case The width and the extremes of the two intervals are approximately the same. 
+
+So from the results  we can say that in 95% of cases the value of the parameter is between 3.02 and 4.73.
+
+# d)
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+{par(mfrow=c(2,1))
+  
+plot(theta, dgamma(theta,3.22 , 1), type = 'l', lwd = 2, col = 'orange',
+     ylim = c(0, 1.2), xlab = expression(theta),main="Prior Distribution",ylab="")
+
+
+
+plot(theta, dgamma(theta, s_post, r_post), type = 'l', lwd = 2, col = '#528B8B',
+     ylim = c(0, 1.2), xlab = expression(theta),main="Posterior Distribution",ylab="")}
+```
+
+
+Analyzing the differences between the two distributions, it is possible to notice that the Prior one has a much greater variability concerning the estimate of $\theta$: in fact there is no evident peak, moreover many values of $\theta$ have a similar probability value, this is not at all useful in estimating the value of the parameter.
+
+After observing the data, the posterior distribution shows a much more accurate and centered estimate by assigning high probabilities to a few values of $\theta$.
+
+```{r}
+cbind(Mean_pre,y_bar,Mean_Post)
+```
+
+Furthermore, it is possible to comment on the weight had by the prior distribution on the posterior one by analyzing the three averages reported: the mean of the posterior is much closer to the sample one than the one of the prior.
+This makes us understand that the influence of likelihood was greater than the prior distribution. 
+
+
+
+# e)
+
+The posterior predictive distribution is the distribution of future observable data ($Y_{Next}$) , based on the posterior distribution.
+
+$p(Y_{Next}|y_1,...,y_n) = \int_{0}^{\infty} p(Y_{Next}|\theta,y_1,...,y_n) p(\theta|y_1,...,y_n) d\theta$
+
+It is known that in the Gamma-poisson case $p(Y_{Next}|y_1,...,y_n)  = \int_{0}^{\infty} \frac{1}{y_{Next}!}\theta^{y_{Next}}e^{-\theta} \frac{(r+n)^{s+\sum y_i}}{\Gamma(y_{Next})\Gamma(s+\sum y_i)} \theta^{s+\sum y_i -1} e^{-(r+n)\theta} \sim NegBin(p= \frac{r+n}{(r+n+1)}, m= s + \sum y_i)$
+
+```{r, echo=FALSE}
+y_grid <- 0:10
+
+
+plot(y_grid, dnbinom(y_grid, size = s_post, prob = r_post / (1 + r_post)),
+     type = 'h', lwd = 3, col = 'slateblue1', xlab = expression(y_Next),
+     ylab = 'Probability',ylim=c(0,0.40))
+lines(y_grid, dnbinom(y_grid, size = s_post, prob = r_post / (1 + r_post)),
+      type = 'p', lwd = 3, col = 'slateblue1')
+
+lines(table(mydata$car_accidents)/19, lwd = 3, col = 'mediumseagreen')
+lines(table(mydata$car_accidents)/19,type='p', lwd = 3, col = 'mediumseagreen')
+legend('topright', inset = .02, 
+       legend = c('posterior predictive', 'observed data'),
+       col = c('slateblue1', 'mediumseagreen'), lwd = 3)
+
+```
+
+Observing the graph we realize how the two distributions are more or less similar in shape, even if the biggest problem between the two is the value 8.
+
+First we generate 1000 samples by the negative binomial of the same size as the one provided at the beginning.
+
+
+```{r}
+
+num.sim<-19
+Means_sim<-rep(0,1000)
+Matr_sim<-matrix(0,1000,num.sim)
+
+for(i in 1:1000){
+  Matr_sim[i,]<-rnbinom(num.sim, size = s_post, prob = r_post / (1 + r_post))
+}
+
+for(i in 1:1000){
+ Means_sim[i]<-sum(Matr_sim[i,])/19
+}
+y_bar_sim<-sum(Means_sim)/1000
+```
+
+Through this vector we can compare the average of the means of the simulations to the sample one of the dataset:
+
+```{r}
+cbind(y_bar_sim,y_bar)
+```
+
+The two values turn out to be very similar to each other, so it is possible to say that on average the mean number of observed car accidents is close to those predicted by the posterior predictive distribution.
+
+
+## Bulb Lifetime
+
+# 1
+The Main ingredientes of a bayes model setup are: 
+\
+\
+1. The Prior distribution: $\pi(\theta)$ for each values of $\theta \in \Theta$ describes our belief that $\theta$ represents the true population characteristics.
+\
+\
+2. The Likelihood: $f(y_i|\theta)$ for each values of $\theta \in \Theta$ and $y \in Y$ describes our belief that y would be the outcome of our study if we knew $\theta$ to be true.
+\
+\
+3. The Marginal distribution of the y ($m(y)$) that has the role of a normalizing constant.
+\
+\
+After observing the data, we update our beliefs and calculate the posterior distribution through Bayes' formula: $f(\theta|y_i) = \frac{f(y_i|\theta)\pi(\theta)}{m(y)}$
+
+# 2
+
+
+As before we have to solve a system of equations to find the parameters:
+
+
+
+\begin{cases}
+\frac{s}{r} = 0.003\\
+\frac{s}{r^2} = 0.00173^2
+
+\end{cases}
+
+
+$\Longrightarrow$
+
+
+
+\begin{cases}
+s = 3.007117\\
+r = 1002.372
+
+\end{cases}
+
+
+```{r}
+
+s_prior_2<- (0.003/(0.00173^2))*0.003
+r_prior_2<- 0.003/(0.00173^2)
+
+```
+
+```{r, echo = F}
+curve(dgamma(x,shape=s_prior_2,rate=r_prior_2),xlim=c(0,0.01),main="Prior Distribution", xlab=expression(theta), ylab="Density", col="#1874CD")
+```
+
+
+
+# 3
+
+We have vague knowledge as we have not yet observed data, in fact the prior distribution as said before represent only our belief about the parameter.
+
+```{r}
+y_obs<-c(1, 13, 27, 43, 73, 75, 154, 196, 220, 297,
+         344, 610, 734, 783, 796, 845, 859, 992, 1066, 1471)
+y_mean<-mean(y_obs)
+y_mean
+```
+In addition, the mean of the prior distribution ($\frac{1}{0.003} = 333.3$) is quite distant from the sample one (479.95).
+
+
+```{r}
+alpha_conf<-0.05
+
+q_2_2 <- qgamma(alpha_conf / 2, s_prior_2, r_prior_2)
+q_1_2 <- qgamma(1 - alpha_conf / 2, s_prior_2, r_prior_2)
+c(1/q_1_2, 1/q_2_2)
+diff(c(1/q_1_2, 1/q_2_2))
+```
+
+The idea that we are giving a very vague guess about the average bulb life value is also largely supported by the results of the calculated confidence interval:
+in 95% of cases the value of $\frac{1}{\theta}$ will be between 138.5 and 1612.2, with a range of 1473.7.
+This information does not contribute much to the estimation of the true value.
+
+
+
+
+
+
+
+# 4
+We know that $Y_i|\theta \sim exp(\theta)$:
+\
+
+$f_{y_i|\Theta}(y_i|\theta) = \theta e^{- \theta x_i}$
+\
+Now the joint distribution of the n i.i.d samples is given by: $f(y_i|\theta) = \theta^n e^{- \theta\sum x_i}$.
+
+We assume that $\theta \sim Gamma(\alpha, \beta)$
+
+Now if we use the formula to get the Posterior:
+
+$\Longrightarrow  f_{\Theta|y_i}(\theta|y_i) \propto   \theta^n e^{- \theta\sum x_i} \frac{\beta^\alpha \theta^{\alpha - 1} e^{-\beta \theta}}{\Gamma(\alpha)}$
+\
+\
+$\Longrightarrow f_{\Theta|y_i}(\theta|y_i) \propto \theta^{n + \alpha -1} e^{- \theta(\sum x_i + \beta)}$
+\
+\
+$\Longrightarrow \theta|Y \sim Gamma(\alpha + n, \beta +\sum x_i)$
+\
+\
+So, its respects the definition of a Conjugate Prior.
+
+
+# 5
+
+
+
+
+```{r, echo = F}
+par(mfrow=c(1,2))
+hist(y_obs,xlim=c(0,2000),xlab="Hours", col="#008B00", main="Histogram of the bulb's life time")
+abline(v=y_mean,lwd=2, lty=2)
+boxplot(y_obs,col="#008B00",xlab="Hours",horizontal = T)
+```
+
+```{r}
+y_mean
+```
+
+
+Analyzing the data it is immediately possible to notice the great variability of the life time of the bulbs: it goes from one hour to 1471 hours, that is about 61 days.
+The average lifetime of a bulb of the data is equal to 479.95.
+We can see from the graphs that the distribution is not symmetrical.
+
+
+
+```{r}
+s_post_2<- s_prior_2 + as.numeric(length(y_obs))
+r_post_2<- r_prior_2 + as.numeric(sum(y_obs))
+cbind(s_post_2, r_post_2)
+```
+
+
+After observing the data, the parameters were updated according to the rule given in the fourth point.
+
+
+```{r}
+Mode_Post_2<-(s_post_2-1)/r_post_2
+Mean_Post_2<-s_post_2/r_post_2
+Median_Post_2<-qgamma(0.5, s_post_2, r_post_2)
+
+cbind(Mode_Post_2,Median_Post_2,Mean_Post_2)
+
+posterior_qf2 <- function(x){
+  qgamma(x,shape=s_post_2,rate=r_post_2)
+}
+
+hpd(posterior.icdf=posterior_qf2, conf=0.95, tol=0.00000001)
+diff(hpd(posterior.icdf=posterior_qf2, conf=0.95, tol=0.00000001)) # the width
+
+```
+
+We have learnt the three suitable estimates of $\theta$ and also the highest posterior density interval.
+To make inference about $\psi= \frac{1}{\theta}$, instead it is necessary to use the Inverse-gamma distribution.
+In fact if $\theta \sim Gamma(\alpha, \beta) \Longrightarrow \frac{1}{\theta} = \psi \sim InvGamma(\alpha, \beta)$.
+
+
+```{r}
+library(invgamma)
+
+Mode_Post_Inv<-r_post_2/(s_post_2+1)
+
+Mean_Post_Inv<-r_post_2/(s_post_2-1)
+Median_Post_Inv<-qinvgamma(0.5, s_post_2, r_post_2)
+
+cbind(Mode_Post_Inv,Median_Post_Inv,Mean_Post_Inv)
+
+posterior_qf3 <- function(x){
+  qinvgamma(x,shape=s_post_2,rate=r_post_2)
+}
+
+hpd(posterior.icdf=posterior_qf3, conf=0.95, tol=0.00000001)
+diff(hpd(posterior.icdf=posterior_qf3, conf=0.95, tol=0.00000001)) # the width
+
+```
+
+Using the posterior distribution we obtain that the average life time is 481.7 hours, the median is 467.5 and finally the mode (the peak of the distribution) is equal to 441.6.
+
+In addition, through the HPD interval with the alpha set in the code, we can say that 95% of the time the life time value of innovative bulbs is between 299 and 692 hours.
+
+```{r, echo = F}
+polygon(curve(dinvgamma(x,shape= s_prior_2, rate= r_prior_2),from=0,to=1000,xlab=expression(psi),cex.main=0.5,1000,ylim=c(0,0.006), col="#63B8FF", lwd=2, ylab="Density"),col=c("#63B8FF",alpha=0.2))
+
+polygon(curve(dinvgamma(x,shape=s_post_2,rate=r_post_2),from=0,to=1000,xlab=expression(theta),main="",cex.main=0.5,1000,add=TRUE, col = 'red', lwd=2), col = "red")
+legend("topright",legend=c("Prior", "Posterior"), fill=c("#63B8FF", "red"),bg="#CAFF70")
+```
+
+# 6
+
+To answer the question i have to use the CDF of the posterior distribution: $P(\psi > 550 | y_1, ...,y_n) = 1- P(\psi \leq 550 | y_1, ...,y_n) = 1- F(550)$.
+
+
+
+```{r, echo = F}
+pa<-curve(pinvgamma(x,s_post_2,r_post_2),xlim=c(0,1000),main="CDF of the Posterior Distribution",ylab="Cumulative Density",xlab=expression(psi))
+polygon(c(pa$x[pa$x>=550], max(pa$x), 550 ),  c( pa$y[pa$x>=550],0.77,0.77 ), col="red")
+abline(h=min(pa$y[pa$x>=550]),lwd=2,lty=2)
+abline(v=550,lwd=2)
+
+```
+
+
+```{r}
+1-pinvgamma(550,s_post_2,r_post_2)
+```
+
+So the probability that  the average bulb lifetime exceeds 550 hours is 22.54%
+
+Analyzing only the data we have that 9 bulbs out of 20 last more than 550 hours, so the probability should be close to 50%, the big difference that we have with the value obtained from the Cumulative density function depends on the role that had the prior distribution in influencing the posterior one. Because a low number of data was observed and at the same time the prior gamma distribution has a remarkably high rate value, the likelihood did not have much power in influencing the posterior distribution.
+
+
